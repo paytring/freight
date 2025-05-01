@@ -1,4 +1,4 @@
-module paytring/freight
+module github.com/paytring/freight
 
 go 1.23.4
 

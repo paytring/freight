@@ -7,8 +7,6 @@ import (
 	"strconv"
 	"time"
 
-	"strings"
-
 	"github.com/go-resty/resty/v2"
 )
 
@@ -43,20 +41,17 @@ func (d *DHLProvider) Calculate(details DeliveryDetails) (float64, error) {
 
 	// Prepare Query Params
 	queryParams := url.Values{}
-	// Assuming Origin/Destination are structured like "CountryCode,CityName"
-	// Need robust parsing based on actual format
-	originParts := splitLocation(details.Origin)           // Placeholder - implement splitLocation
-	destinationParts := splitLocation(details.Destination) // Placeholder - implement splitLocation
 
-	if len(originParts) < 2 || len(destinationParts) < 2 {
-		return 0, fmt.Errorf("invalid origin or destination format")
+	// Use the new explicit fields and add validation
+	if details.OriginCountryCode == "" || details.OriginCityName == "" || details.DestinationCountryCode == "" || details.DestinationCityName == "" {
+		return 0, fmt.Errorf("origin and destination country codes and city names are required")
 	}
 
 	queryParams.Set("accountNumber", d.Config["accountNumber"]) // Assuming accountNumber is in Config
-	queryParams.Set("originCountryCode", originParts[0])
-	queryParams.Set("originCityName", originParts[1])
-	queryParams.Set("destinationCountryCode", destinationParts[0])
-	queryParams.Set("destinationCityName", destinationParts[1])
+	queryParams.Set("originCountryCode", details.OriginCountryCode)
+	queryParams.Set("originCityName", details.OriginCityName)
+	queryParams.Set("destinationCountryCode", details.DestinationCountryCode)
+	queryParams.Set("destinationCityName", details.DestinationCityName)
 	queryParams.Set("weight", strconv.FormatFloat(details.Weight, 'f', -1, 64))
 	queryParams.Set("length", strconv.FormatFloat(details.Dimensions.Length, 'f', -1, 64))
 	queryParams.Set("width", strconv.FormatFloat(details.Dimensions.Width, 'f', -1, 64))
@@ -121,17 +116,4 @@ func (d *DHLProvider) Calculate(details DeliveryDetails) (float64, error) {
 	// Returning a dummy value until parsing is implemented
 	d.Logger.Warn().Msg("DHL Response parsing not implemented, returning dummy rate")
 	return 99.99, nil // Replace with actual parsed rate
-}
-
-// splitLocation is a placeholder helper function. Implement based on actual format.
-// Example: "US,New York" -> ["US", "New York"]
-func splitLocation(location string) []string {
-	// Implement logic to split country code and city name
-	// This is a very basic example, needs error handling and validation
-	parts := make([]string, 0, 2)
-	split := strings.SplitN(location, ",", 2)
-	if len(split) == 2 {
-		parts = append(parts, strings.TrimSpace(split[0]), strings.TrimSpace(split[1]))
-	}
-	return parts
 }

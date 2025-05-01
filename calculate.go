@@ -1,10 +1,12 @@
 package freight
 
 type DeliveryDetails struct {
-	Weight      float64
-	Dimensions  DeliveryDimensions
-	Origin      string
-	Destination string
+	Weight                 float64
+	Dimensions             DeliveryDimensions
+	OriginCountryCode      string // Changed from Origin
+	OriginCityName         string // New field
+	DestinationCountryCode string // Changed from Destination
+	DestinationCityName    string // New field
 }
 
 type DeliveryDimensions struct {

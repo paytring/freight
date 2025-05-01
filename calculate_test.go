@@ -10,7 +10,7 @@ func TestDefaultPriceCalculation(t *testing.T) {
 
 	rate.SetLogger(nil)
 
-	// Set up the delivery details
+	// Set up the delivery details with new fields
 	details := DeliveryDetails{
 		Weight: 10.0,
 		Dimensions: DeliveryDimensions{
@@ -18,8 +18,10 @@ func TestDefaultPriceCalculation(t *testing.T) {
 			Width:  5.0,
 			Height: 5.0,
 		},
-		Origin:      "New York, NY",
-		Destination: "Los Angeles, CA",
+		OriginCountryCode:      "US",          // New field
+		OriginCityName:         "New York",    // New field
+		DestinationCountryCode: "US",          // New field
+		DestinationCityName:    "Los Angeles", // New field
 	}
 
 	expectedRate := 25.0 // Expected rate based on the weight and dimensions
