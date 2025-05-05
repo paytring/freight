@@ -1,29 +1,20 @@
 # Freight Rate Calculator
 
-[![Go Reference](https://pkg.go.dev/badge/paytring/freight.svg)](https://pkg.go.dev/paytring/freight)
-
-A Go library for calculating freight and shipping rates from various providers.
-
-## Description
-
-This library provides a common interface and base implementation for calculating shipping costs. It allows integrating different shipping providers (like DHL, FedEx, etc.) through specific provider implementations.
+A Go library for calculating freight and shipping rates from various providers (DHL, FedEx, and more) with a unified interface.
 
 ## Features
-
-*   Basic rate calculation based on weight and dimensions.
-*   Provider-specific rate calculation (currently supports DHL via its API).
-*   Configurable settings for API keys, secrets, and provider-specific parameters.
-*   Structured logging using `zerolog`.
+- Seamless provider switching: Just change the provider name in config, no code changes needed.
+- Supports DHL and FedEx APIs (with full authentication and package details).
+- Returns both rate and currency for each calculation.
+- Extensible: Add more providers easily.
 
 ## Installation
 
-To use this library in your Go project:
-
 ```bash
-go get paytring/freight
+go get github.com/paytring/freight
 ```
 
-## Usage
+## Usage Example
 
 ```go
 package main
@@ -31,80 +22,52 @@ package main
 import (
 	"fmt"
 	"paytring/freight"
-
 	"github.com/rs/zerolog/log"
 )
 
 func main() {
-	// --- Basic Calculation Example ---
-	basicRate := freight.NewRate("basic", "", "") // Provider name can be anything for basic
-	basicRate.SetLogger(&log.Logger)
+	// Choose provider: "DHL" or "FEDEX"
+	rate := freight.NewRate("FEDEX", "YOUR_CLIENT_ID", "YOUR_CLIENT_SECRET")
+	rate.SetLogger(&log.Logger)
+	rate.SetConfig(map[string]string{
+		"accountNumber":         "YOUR_FEDEX_ACCOUNT_NUMBER",
+			"serviceType":           "FEDEX_INTERNATIONAL_PRIORITY",
+		"pickupType":            "CONTACT_FEDEX_TO_SCHEDULE",
+		"packagingType":         "FEDEX_25KG_BOX",
+		"weightUnit":            "LB",
+	})
 
 	details := freight.DeliveryDetails{
-		Weight: 10.0,
+		Weight: 22.0,
 		Dimensions: freight.DeliveryDimensions{
-			Length: 15.0,
-			Width:  10.0,
-			Height: 5.0,
+			Length: 10.0,
+			Width:  8.0,
+			Height: 2.0,
 		},
-			OriginCountryCode:    "US", // Updated field
-		OriginCityName:       "New York", // New field
-		DestinationCountryCode: "US", // Updated field
-		DestinationCityName:  "Los Angeles", // New field
+		OriginCountryCode:      "CA",
+		OriginCityName:         "Toronto",
+		OriginPostalCode:       "m1m1m1",
+		DestinationCountryCode: "US",
+		DestinationCityName:    "Memphis",
+		DestinationPostalCode:  "38116",
 	}
 
-	calculatedRate, err := basicRate.Calculate(details)
+	rateValue, currency, err := rate.Calculate(details)
 	if err != nil {
-		log.Fatal().Err(err).Msg("Error calculating basic rate")
+		log.Fatal().Err(err).Msg("Error calculating rate")
 	}
-	fmt.Printf("Basic Calculated Rate: %.2f\n", calculatedRate)
-
-	// --- DHL Provider Example ---
-	// Replace with your actual API Key and Secret
-	dhlAPIKey := "YOUR_DHL_API_KEY"
-	dhlAPISecret := "YOUR_DHL_API_SECRET"
-
-	dhlProvider := freight.NewDHLProvider(dhlAPIKey, dhlAPISecret)
-	dhlProvider.SetLogger(&log.Logger)
-
-	// Set necessary configuration for DHL
-	dhlConfig := map[string]string{
-		"accountNumber": "YOUR_DHL_ACCOUNT_NUMBER",
-		// Add other DHL specific config if needed
-	}
-	if err := dhlProvider.SetConfig(dhlConfig); err != nil {
-		log.Fatal().Err(err).Msg("Error setting DHL config")
-	}
-
-	// Use the same delivery details (already updated structure)
-	dhlRate, err := dhlProvider.Calculate(details) // DHL provider uses the updated details struct
-	if err != nil {
-		log.Fatal().Err(err).Msg("Error calculating DHL rate")
-	}
-	fmt.Printf("DHL Calculated Rate: %.2f\n", dhlRate)
-
+	fmt.Printf("Calculated Rate: %.2f %s\n", rateValue, currency)
 }
 ```
 
-**Note:** The DHL provider requires specific configuration (like `accountNumber`) and needs the API response parsing logic to be fully implemented in `dhl.go`.
-
-## Configuration
-
-*   **API Key & Secret:** Required for providers that use API authentication.
-*   **Provider Config:** Use the `SetConfig` method to pass provider-specific parameters (e.g., account numbers, service types).
+## FedEx API Details
+See [docs/fedex.md](docs/fedex.md) for full request/response examples and authentication instructions.
 
 ## Testing
-
-Run the tests using the standard Go tool:
 
 ```bash
 go test ./
 ```
 
-## Contributing
-
-Contributions are welcome! Please feel free to submit pull requests or open issues.
-
 ## License
-
-(Specify your license here, e.g., MIT License)
+MIT or your preferred license.

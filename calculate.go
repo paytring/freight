@@ -3,10 +3,12 @@ package freight
 type DeliveryDetails struct {
 	Weight                 float64
 	Dimensions             DeliveryDimensions
-	OriginCountryCode      string // Changed from Origin
-	OriginCityName         string // New field
-	DestinationCountryCode string // Changed from Destination
-	DestinationCityName    string // New field
+	OriginCountryCode      string
+	OriginCityName         string
+	OriginPostalCode       string // Added
+	DestinationCountryCode string
+	DestinationCityName    string
+	DestinationPostalCode  string // Added
 }
 
 type DeliveryDimensions struct {
@@ -15,18 +17,20 @@ type DeliveryDimensions struct {
 	Height float64
 }
 
-func (r *Rate) Calculate(details DeliveryDetails) (float64, error) {
-
-	r.Logger.Info().Msg("Calculating rate for delivery")
-
-	finalRate := details.Weight * 1.5
-
-	if details.Dimensions.Length > 20 || details.Dimensions.Width > 20 || details.Dimensions.Height > 20 {
-		finalRate += 10.0
+// Rate now acts as a dynamic provider selector
+func (r *Rate) Calculate(details DeliveryDetails) (float64, string, error) {
+	var provider Provider
+	switch r.Provider {
+	case "DHL":
+		provider = NewDHLProvider(r.ApiKey, r.ApiSecret)
+	case "FEDEX":
+		provider = NewFedExProvider(r.ApiKey, r.ApiSecret)
+	default:
+		provider = r // fallback to base Rate logic
 	}
-
-	r.Logger.Info().Msgf("Final rate calculated: %v", finalRate)
-
-	return finalRate, nil
-
+	provider.SetLogger(&r.Logger)
+	if err := provider.SetConfig(r.Config); err != nil {
+		return 0, "", err
+	}
+	return provider.Calculate(details)
 }
