@@ -9,13 +9,11 @@ func TestFedExProviderCalculation(t *testing.T) {
 	rate.SetLogger(nil)
 
 	rate.SetConfig(map[string]string{
-		"accountNumber":         "740561073",
-		"originPostalCode":      "122051",
-		"destinationPostalCode": "38116",
-		"serviceType":           "FEDEX_INTERNATIONAL_PRIORITY",
-		"pickupType":            "CONTACT_FEDEX_TO_SCHEDULE",
-		"packagingType":         "FEDEX_25KG_BOX",
-		"weightUnit":            "LB",
+		"accountNumber": "740561073",
+		"serviceType":   "FEDEX_INTERNATIONAL_PRIORITY",
+		"pickupType":    "CONTACT_FEDEX_TO_SCHEDULE",
+		"packagingType": "FEDEX_25KG_BOX",
+		"weightUnit":    "LB",
 	})
 
 	details := DeliveryDetails{
