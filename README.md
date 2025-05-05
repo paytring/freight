@@ -21,7 +21,7 @@ package main
 
 import (
 	"fmt"
-	"paytring/freight"
+	"github.com/paytring/freight"
 	"github.com/rs/zerolog/log"
 )
 
