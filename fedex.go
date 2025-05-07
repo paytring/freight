@@ -8,16 +8,14 @@ import (
 	"github.com/go-resty/resty/v2"
 )
 
-const fedexAPIURL = "https://apis-sandbox.fedex.com/rate/v1/rates/quotes"
+const fedexAPIURL = "https://api.fedex.com/rate/v1/rates/quotes"
 
-// FedExProvider implements the rate calculation logic for FedEx.
 type FedExProvider struct {
-	Rate        // Embed the base Rate struct
+	Rate
 	bearerToken string
-	tokenExpiry int64 // Unix timestamp
+	tokenExpiry int64
 }
 
-// NewFedExProvider creates a new instance of FedExProvider.
 func NewFedExProvider(apiKey, apiSecret string) *FedExProvider {
 	return &FedExProvider{
 		Rate: Rate{
@@ -30,7 +28,7 @@ func NewFedExProvider(apiKey, apiSecret string) *FedExProvider {
 
 func (f *FedExProvider) getBearerToken() (string, error) {
 	if f.bearerToken != "" && f.tokenExpiry > 0 && f.tokenExpiry > time.Now().Unix()+60 {
-		return f.bearerToken, nil // Token is still valid
+		return f.bearerToken, nil
 	}
 	clientID := f.ApiKey
 	clientSecret := f.ApiSecret
@@ -46,13 +44,18 @@ func (f *FedExProvider) getBearerToken() (string, error) {
 func fetchFedExAuthTokenWithExpiry(clientID, clientSecret string) (string, int64, error) {
 	client := resty.New()
 	resp, err := client.R().
-		SetHeader("Content-Type", "application/x-www-form-urlencoded").
+		SetHeader("accept", "application/json, text/plain, */*").
+		SetHeader("accept-language", "en-GB,en-US;q=0.9,en;q=0.8").
+		SetHeader("cache-control", "no-cache").
+		SetHeader("content-type", "application/x-www-form-urlencoded;charset=UTF-8").
+		SetHeader("origin", "https://www.fedex.com").
+		SetHeader("referer", "https://www.fedex.com/secure-login/en-in/").
 		SetFormData(map[string]string{
 			"grant_type":    "client_credentials",
 			"client_id":     clientID,
 			"client_secret": clientSecret,
 		}).
-		Post("https://apis-sandbox.fedex.com/oauth/token")
+		Post("https://api.fedex.com/auth/oauth/v2/token")
 
 	if err != nil {
 		return "", 0, fmt.Errorf("failed to get FedEx auth token: %w", err)
@@ -75,26 +78,54 @@ func fetchFedExAuthTokenWithExpiry(clientID, clientSecret string) (string, int64
 	return result.AccessToken, expiry, nil
 }
 
-// Calculate fetches the rate from the FedEx API.
-func (f *FedExProvider) Calculate(details DeliveryDetails) (float64, string, error) {
-	f.Logger.Info().Msg("Calculating rate for delivery via FedEx")
-
+func fetchFedExRates(clientID, clientSecret string, payload map[string]interface{}) (map[string]interface{}, error) {
 	client := resty.New()
 
-	accountNumber := f.Config["accountNumber"]
-	if accountNumber == "" {
-		return 0, "", fmt.Errorf("FedEx accountNumber is required in config")
+	// Fetch Bearer Token
+	token, expiry, err := fetchFedExAuthTokenWithExpiry(clientID, clientSecret)
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch FedEx auth token: %w", err)
+	}
+	if expiry <= time.Now().Unix() {
+		return nil, fmt.Errorf("FedEx auth token expired")
 	}
 
-	token, err := f.getBearerToken()
+	// Make API request
+	resp, err := client.R().
+		SetHeader("Authorization", "Bearer "+token).
+		SetHeader("origin", "https://www.fedex.com").
+		SetHeader("referer", "https://www.fedex.com/en-in/online/rating.html").
+		SetHeader("x-clientid", "MAGR").
+		SetHeader("x-clientversion", "1.0").
+		SetHeader("x-locale", "en_IN").
+		SetHeader("Content-Type", "application/json").
+		SetBody(payload).
+		Post("https://api.fedex.com/rate/v2/rates/quotes")
+
 	if err != nil {
-		return 0, "", fmt.Errorf("could not get FedEx bearer token: %w", err)
+		return nil, fmt.Errorf("failed to fetch FedEx rates: %w", err)
 	}
+	if resp.IsError() {
+		return nil, fmt.Errorf("FedEx rates API error: %s", resp.Status())
+	}
+
+	// Parse response
+	var result map[string]interface{}
+	if err := json.Unmarshal(resp.Body(), &result); err != nil {
+		return nil, fmt.Errorf("failed to parse FedEx rates response: %w", err)
+	}
+
+	return result, nil
+}
+
+// Updated the FedExProvider to include available service options, their codes, descriptions, delivery dates, and pricing parameters.
+func (f *FedExProvider) Calculate(details DeliveryDetails) ([]map[string]interface{}, error) {
+	f.Logger.Info().Msg("Calculating rate for delivery via FedEx")
 
 	// Build request payload
 	payload := map[string]interface{}{
 		"accountNumber": map[string]interface{}{
-			"value": accountNumber,
+			"value": f.Config["accountNumber"],
 		},
 		"requestedShipment": map[string]interface{}{
 			"shipper": map[string]interface{}{
@@ -110,17 +141,9 @@ func (f *FedExProvider) Calculate(details DeliveryDetails) (float64, string, err
 					"residential": true,
 				},
 			},
-			"serviceType":     f.Config["serviceType"],
-			"pickupType":      f.Config["pickupType"],
-			"packagingType":   f.Config["packagingType"],
 			"rateRequestType": []string{"ACCOUNT", "LIST"},
 			"requestedPackageLineItems": []map[string]interface{}{
 				{
-					"subPackagingType": "CASE",
-					// "declaredValue": map[string]interface{}{
-					// 	"amount":   100,
-					// 	"currency": "CAD",
-					// },
 					"weight": map[string]interface{}{
 						"units": f.Config["weightUnit"],
 						"value": details.Weight,
@@ -135,48 +158,56 @@ func (f *FedExProvider) Calculate(details DeliveryDetails) (float64, string, err
 		},
 	}
 
-	resp, err := client.R().
-		SetHeader("X-locale", "en_US").
-		SetHeader("Content-Type", "application/json").
-		SetHeader("authorization", "Bearer "+token).
-		SetBody(payload).
-		Post(fedexAPIURL)
-
+	// Use fetchFedExRates to get rates
+	result, err := fetchFedExRates(f.ApiKey, f.ApiSecret, payload)
 	if err != nil {
-		f.Logger.Error().Err(err).Msg("FedEx API request failed")
-		return 0, "", fmt.Errorf("failed to call FedEx API: %w", err)
+		f.Logger.Error().Err(err).Msg("Failed to fetch FedEx rates")
+		return nil, fmt.Errorf("failed to fetch FedEx rates: %w", err)
 	}
 
-	if resp.IsError() {
-		f.Logger.Error().Str("status", resp.Status()).Bytes("body", resp.Body()).Msg("FedEx API returned error")
-		return 0, "", fmt.Errorf("FedEx API error: %s", resp.Status())
+	// Parse response to extract service options
+	output, ok := result["output"].(map[string]interface{})
+	if !ok {
+		return nil, fmt.Errorf("invalid response format from FedEx API")
 	}
 
-	f.Logger.Info().Str("status", resp.Status()).Msg("FedEx API request successful")
-	f.Logger.Debug().Bytes("body", resp.Body()).Msg("FedEx API Response Body")
-
-	// Parse response to extract the rate and currency
-	var result struct {
-		Output struct {
-			RateReplyDetails []struct {
-				RatedShipmentDetails []struct {
-					TotalNetCharge float64 `json:"totalNetCharge"`
-					Currency       string  `json:"currency"`
-				} `json:"ratedShipmentDetails"`
-			} `json:"rateReplyDetails"`
-		} `json:"output"`
-	}
-	if err := json.Unmarshal(resp.Body(), &result); err != nil {
-		f.Logger.Error().Err(err).Msg("Failed to parse FedEx response")
-		return 0, "", fmt.Errorf("failed to parse FedEx response: %w", err)
+	rateReplyDetails, ok := output["rateReplyDetails"].([]interface{})
+	if !ok || len(rateReplyDetails) == 0 {
+		return nil, fmt.Errorf("no service options found in FedEx response")
 	}
 
-	if len(result.Output.RateReplyDetails) == 0 || len(result.Output.RateReplyDetails[0].RatedShipmentDetails) == 0 {
-		return 0, "", fmt.Errorf("no rate found in FedEx response")
+	// Extract service options
+	serviceOptions := []map[string]interface{}{}
+	for _, detail := range rateReplyDetails {
+		detailMap, ok := detail.(map[string]interface{})
+		if !ok {
+			continue
+		}
+
+		serviceType, _ := detailMap["serviceType"].(string)
+		serviceName, _ := detailMap["serviceName"].(string)
+		commit, _ := detailMap["commit"].(map[string]interface{})
+		dateDetail, _ := commit["dateDetail"].(map[string]interface{})
+		deliveryDate, _ := dateDetail["day"].(string)
+		deliveryTime, _ := dateDetail["time"].(string)
+
+		ratedShipmentDetails, _ := detailMap["ratedShipmentDetails"].([]interface{})
+		if len(ratedShipmentDetails) == 0 {
+			continue
+		}
+		firstRatedDetail, _ := ratedShipmentDetails[0].(map[string]interface{})
+		price, _ := firstRatedDetail["totalNetCharge"].(float64)
+		currency, _ := firstRatedDetail["currency"].(string)
+
+		serviceOptions = append(serviceOptions, map[string]interface{}{
+			"serviceType":  serviceType,
+			"serviceName":  serviceName,
+			"deliveryDate": deliveryDate,
+			"deliveryTime": deliveryTime,
+			"price":        price,
+			"currency":     currency,
+		})
 	}
 
-	rate := result.Output.RateReplyDetails[0].RatedShipmentDetails[0].TotalNetCharge
-	currency := result.Output.RateReplyDetails[0].RatedShipmentDetails[0].Currency
-	f.Logger.Info().Float64("rate", rate).Str("currency", currency).Msg("FedEx rate extracted")
-	return rate, currency, nil
+	return serviceOptions, nil
 }

@@ -18,19 +18,32 @@ type DeliveryDimensions struct {
 }
 
 // Rate now acts as a dynamic provider selector
-func (r *Rate) Calculate(details DeliveryDetails) (float64, string, error) {
+func (r *Rate) Calculate(details DeliveryDetails) ([]map[string]interface{}, error) {
 	var provider Provider
 	switch r.Provider {
-	case "DHL":
-		provider = NewDHLProvider(r.ApiKey, r.ApiSecret)
 	case "FEDEX":
 		provider = NewFedExProvider(r.ApiKey, r.ApiSecret)
 	default:
-		provider = r // fallback to base Rate logic
+		return r.calculateBase(details)
 	}
+
 	provider.SetLogger(&r.Logger)
 	if err := provider.SetConfig(r.Config); err != nil {
-		return 0, "", err
+		return nil, err
 	}
 	return provider.Calculate(details)
+
+}
+
+// calculateBase handles the base Rate calculation logic
+func (r *Rate) calculateBase(details DeliveryDetails) ([]map[string]interface{}, error) {
+	// Implement your base rate calculation logic here
+	// This is a placeholder implementation
+	result := []map[string]interface{}{
+		{
+			"price":    0.0,
+			"provider": "DEFAULT",
+		},
+	}
+	return result, nil
 }

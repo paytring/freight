@@ -57,5 +57,5 @@ func (r *Rate) SetConfig(config map[string]string) error {
 type Provider interface {
 	SetLogger(logger *zerolog.Logger)
 	SetConfig(config map[string]string) error
-	Calculate(details DeliveryDetails) (float64, string, error)
+	Calculate(details DeliveryDetails) ([]map[string]interface{}, error)
 }
