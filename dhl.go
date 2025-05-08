@@ -44,15 +44,15 @@ func (d *DHLProvider) Calculate(details DeliveryDetails) (float64, string, error
 	queryParams := url.Values{}
 
 	// Use the new explicit fields and add validation
-	if details.OriginCountryCode == "" || details.OriginCityName == "" || details.DestinationCountryCode == "" || details.DestinationCityName == "" {
+	if details.OriginAddress.CountryCode == "" || details.OriginAddress.City == "" || details.DestinationAddress.CountryCode == "" || details.DestinationAddress.City == "" {
 		return 0, "", fmt.Errorf("origin and destination country codes and city names are required")
 	}
 
 	queryParams.Set("accountNumber", d.Config["accountNumber"]) // Assuming accountNumber is in Config
-	queryParams.Set("originCountryCode", details.OriginCountryCode)
-	queryParams.Set("originCityName", details.OriginCityName)
-	queryParams.Set("destinationCountryCode", details.DestinationCountryCode)
-	queryParams.Set("destinationCityName", details.DestinationCityName)
+	queryParams.Set("originCountryCode", details.OriginAddress.CountryCode)
+	queryParams.Set("originCityName", details.OriginAddress.City)
+	queryParams.Set("destinationCountryCode", details.DestinationAddress.CountryCode)
+	queryParams.Set("destinationCityName", details.DestinationAddress.City)
 	queryParams.Set("weight", strconv.FormatFloat(details.Weight, 'f', -1, 64))
 	queryParams.Set("length", strconv.FormatFloat(details.Dimensions.Length, 'f', -1, 64))
 	queryParams.Set("width", strconv.FormatFloat(details.Dimensions.Width, 'f', -1, 64))

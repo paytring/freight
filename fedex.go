@@ -3,6 +3,7 @@ package freight
 import (
 	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"time"
 
 	"github.com/go-resty/resty/v2"
@@ -78,6 +79,13 @@ func fetchFedExAuthTokenWithExpiry(clientID, clientSecret string) (string, int64
 	return result.AccessToken, expiry, nil
 }
 
+func saveResponseToFile(resp *resty.Response, fileName string) error {
+	err := ioutil.WriteFile(fileName, resp.Body(), 0644)
+	if err != nil {
+		return err
+	}
+	return nil
+}
 func fetchFedExRates(clientID, clientSecret string, payload map[string]interface{}) (map[string]interface{}, error) {
 	client := resty.New()
 
@@ -124,62 +132,97 @@ func (f *FedExProvider) Calculate(details DeliveryDetails) ([]FrightRate, error)
 
 	// Build request payload
 	payload := map[string]interface{}{
-		"accountNumber": map[string]interface{}{
-			"value": f.Config["accountNumber"],
-		},
+		// "rateRequestControlParameters": map[string]interface{}{
+		// 	"rateSortOrder":               "COMMITASCENDING",
+		// 	"returnTransitTimes":          true,
+		// 	"variableOptions":             nil,
+		// 	"servicesNeededOnRateFailure": false,
+		// },
 		"requestedShipment": map[string]interface{}{
 			"shipper": map[string]interface{}{
+				"accountNumber": map[string]interface{}{
+					"key":   f.Config["accountKey"],
+					"value": f.Config["accountNumber"],
+				},
 				"address": map[string]interface{}{
-					"postalCode":  details.OriginPostalCode,
-					"countryCode": details.OriginCountryCode,
+					"city":                details.OriginAddress.City,
+					"postalCode":          details.OriginAddress.PostalCode,
+					"countryCode":         details.OriginAddress.CountryCode,
+					"residential":         details.OriginAddress.Residential,
+					"stateOrProvinceCode": details.OriginAddress.StateOrProvinceCode,
 				},
 			},
-			"recipient": map[string]interface{}{
-				"address": map[string]interface{}{
-					"postalCode":  details.DestinationPostalCode,
-					"countryCode": details.DestinationCountryCode,
-					"residential": true,
+			"recipients": []map[string]interface{}{
+				{
+					"address": map[string]interface{}{
+						"city":                details.DestinationAddress.City,
+						"postalCode":          details.DestinationAddress.PostalCode,
+						"countryCode":         details.DestinationAddress.CountryCode,
+						"residential":         details.DestinationAddress.Residential,
+						"stateOrProvinceCode": details.DestinationAddress.StateOrProvinceCode,
+					},
 				},
 			},
-			"rateRequestType": []string{"ACCOUNT", "LIST"},
+			// "shipTimestamp": details.ship,
+			"pickupType":    f.Config["pickupType"], //config
+			"packagingType": f.Config["packagingType"],
+			"shippingChargesPayment": map[string]interface{}{
+				"payor": map[string]interface{}{
+					"responsibleParty": map[string]interface{}{
+						"accountNumber": map[string]interface{}{
+							"key":   f.Config["accountKey"],
+							"value": f.Config["accountNumber"],
+						},
+						"address": map[string]interface{}{
+							"countryCode": details.OriginAddress.CountryCode,
+						},
+					},
+				},
+			},
+			"blockInsightVisibility": false,
+			"edtRequestType":         "NONE",
+			"rateRequestType":        []string{"ACCOUNT", "LIST"},
 			"requestedPackageLineItems": []map[string]interface{}{
 				{
+					"groupPackageCount": 1,
+					"physicalPackaging": f.Config["packagingType"],
+					"insuredValue": map[string]interface{}{
+						"currency": "INR",
+						"amount":   0,
+					},
 					"weight": map[string]interface{}{
 						"units": f.Config["weightUnit"],
 						"value": details.Weight,
 					},
-					"dimensions": map[string]interface{}{
-						"length": details.Dimensions.Length,
-						"width":  details.Dimensions.Width,
-						"height": details.Dimensions.Height,
+				},
+			},
+			"preferredCurrency": "INR",
+			"customsClearanceDetail": map[string]interface{}{
+				"commodities": []map[string]interface{}{
+					{
+						"name":           "NON_DOCUMENTS",
+						"numberOfPieces": 1,
+						"weight": map[string]interface{}{
+							"units": "KG",
+							"value": details.Weight,
+						},
+						"quantity": 1,
+						"unitPrice": map[string]interface{}{
+							"currency": "INR",
+							"amount":   1.000,
+						},
+						"customsValue": map[string]interface{}{
+							"currency": "INR",
+							"amount":   1.000,
+						},
 					},
 				},
 			},
 		},
+		"carrierCodes":            []string{"FDXG", "FDXE"},
+		"returnLocalizedDateTime": true,
+		"webSiteCountryCode":      "IN",
 	}
-
-	// Sample response for testing purposes
-
-	sampleResponse := []FrightRate{}
-	sampleResponse = append(sampleResponse, FrightRate{
-		Title:       "FedEx Express Saver",
-		Description: "Delivery via FedEx By 2023-10-15 17:00",
-		Handle:      "FEDEX_EXPRESS_SAVER",
-		Price:       100.0,
-		Currency:    "USD",
-	})
-
-	sampleResponse = append(sampleResponse, FrightRate{
-		Title:       "FedEx 2Day",
-		Description: "Delivery via FedEx By 2023-10-15 17:00",
-		Handle:      "FEDEX_2DAY",
-		Price:       150.0,
-		Currency:    "USD",
-	})
-
-	return sampleResponse, nil
-
-	// Uncomment the following lines to use the actual FedEx API
 
 	// Use fetchFedExRates to get rates
 	result, err := fetchFedExRates(f.ApiKey, f.ApiSecret, payload)
@@ -219,8 +262,10 @@ func (f *FedExProvider) Calculate(details DeliveryDetails) ([]FrightRate, error)
 			continue
 		}
 		firstRatedDetail, _ := ratedShipmentDetails[0].(map[string]interface{})
-		price, _ := firstRatedDetail["totalNetCharge"].(float64)
-		currency, _ := firstRatedDetail["currency"].(string)
+		totalNetCharge, _ := firstRatedDetail["totalNetCharge"].([]interface{})
+		firstNetCharge, _ := totalNetCharge[0].(map[string]interface{})
+		price, _ := firstNetCharge["amount"].(float64)
+		currency, _ := firstNetCharge["currency"].(string)
 
 		serviceOptions = append(serviceOptions, FrightRate{
 			Title:       serviceName,

@@ -11,8 +11,11 @@ func TestFedExProviderCalculation(t *testing.T) {
 
 	rate.SetConfig(map[string]string{
 		"accountNumber": "453673782",
+		"accountKey":    "a07ef98b62be7bca88e2007220c23084",
+		"serviceType":   "FEDEX_INTERNATIONAL_PRIORITY",
 		"packagingType": "FEDEX_10KG_BOX",
 		"weightUnit":    "KG",
+		"pickupType":    "DROPOFF_AT_FEDEX_LOCATION",
 	})
 
 	details := DeliveryDetails{
@@ -22,16 +25,24 @@ func TestFedExProviderCalculation(t *testing.T) {
 			Width:  10.0,
 			Height: 10.0,
 		},
-		OriginCountryCode:      "CA",
-		OriginCityName:         "Toronto",
-		OriginPostalCode:       "m1m1m1",
-		DestinationCountryCode: "US",
-		DestinationCityName:    "Memphis",
-		DestinationPostalCode:  "38116",
+		OriginAddress: Address{
+			City:                "Chennai",
+			PostalCode:          "600003",
+			CountryCode:         "IN",
+			Residential:         false,
+			StateOrProvinceCode: "TN",
+		},
+		DestinationAddress: Address{
+			City:                "Oklahoma City",
+			PostalCode:          "73102",
+			CountryCode:         "US",
+			Residential:         false,
+			StateOrProvinceCode: "OK",
+		},
 	}
 
 	rateValue, err := rate.Calculate(details)
-	currency := "USD" // Assuming USD as the default currency
+	currency := "INR" // Assuming USD as the default currency
 	if err != nil {
 		t.Logf("FedEx calculation error (expected with dummy credentials): %v", err)
 		// Skip validation when using dummy credentials that we know will fail

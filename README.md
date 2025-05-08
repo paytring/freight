@@ -30,26 +30,35 @@ func main() {
 	rate := freight.NewRate("FEDEX", "YOUR_CLIENT_ID", "YOUR_CLIENT_SECRET")
 	rate.SetLogger(&log.Logger)
 	rate.SetConfig(map[string]string{
-		"accountNumber":         "YOUR_FEDEX_ACCOUNT_NUMBER",
-		"serviceType":           "FEDEX_INTERNATIONAL_PRIORITY",
-		"pickupType":            "CONTACT_FEDEX_TO_SCHEDULE",
-		"packagingType":         "FEDEX_25KG_BOX",
-		"weightUnit":            "LB",
+		"accountNumber":        "YOUR_FEDEX_ACCOUNT_NUMBER",
+		"serviceType":          "FEDEX_INTERNATIONAL_PRIORITY",
+		"accountKey": 			"YOUR_FEDEX_ACCOUNT_KEY"
+		"packagingType": 		"FEDEX_10KG_BOX",
+		"weightUnit":    		"KG",
+		"pickupType":    		"DROPOFF_AT_FEDEX_LOCATION",
 	})
 
 	details := freight.DeliveryDetails{
-		Weight: 22.0,
+		Weight: 15.0,
 		Dimensions: freight.DeliveryDimensions{
 			Length: 10.0,
-			Width:  8.0,
-			Height: 2.0,
+			Width:  10.0,
+			Height: 10.0,
 		},
-		OriginCountryCode:      "CA",
-		OriginCityName:         "Toronto",
-		OriginPostalCode:       "m1m1m1",
-		DestinationCountryCode: "US",
-		DestinationCityName:    "Memphis",
-		DestinationPostalCode:  "38116",
+		OriginAddress: freight.Address{
+			City:                "Chennai",
+			PostalCode:          "600003",
+			CountryCode:         "IN",
+			Residential:         false,
+			StateOrProvinceCode: "TN",
+		},
+		DestinationAddress: freight.Address{
+			City:                "Oklahoma City",
+			PostalCode:          "73102",
+			CountryCode:         "US",
+			Residential:         false,
+			StateOrProvinceCode: "OK",
+		},
 	}
 
 	rateValue, currency, err := rate.Calculate(details)

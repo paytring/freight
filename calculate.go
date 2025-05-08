@@ -1,14 +1,18 @@
 package freight
 
 type DeliveryDetails struct {
-	Weight                 float64
-	Dimensions             DeliveryDimensions
-	OriginCountryCode      string
-	OriginCityName         string
-	OriginPostalCode       string // Added
-	DestinationCountryCode string
-	DestinationCityName    string
-	DestinationPostalCode  string // Added
+	Weight             float64
+	Dimensions         DeliveryDimensions
+	OriginAddress      Address
+	DestinationAddress Address
+}
+
+type Address struct {
+	City                string `json:"city"`
+	PostalCode          string `json:"postalCode"`
+	CountryCode         string `json:"countryCode"`
+	Residential         bool   `json:"residential"`
+	StateOrProvinceCode string `json:"stateOrProvinceCode"`
 }
 
 type DeliveryDimensions struct {
