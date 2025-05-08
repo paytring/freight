@@ -31,7 +31,7 @@ func main() {
 	rate.SetLogger(&log.Logger)
 	rate.SetConfig(map[string]string{
 		"accountNumber":         "YOUR_FEDEX_ACCOUNT_NUMBER",
-			"serviceType":           "FEDEX_INTERNATIONAL_PRIORITY",
+		"serviceType":           "FEDEX_INTERNATIONAL_PRIORITY",
 		"pickupType":            "CONTACT_FEDEX_TO_SCHEDULE",
 		"packagingType":         "FEDEX_25KG_BOX",
 		"weightUnit":            "LB",

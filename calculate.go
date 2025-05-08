@@ -18,7 +18,7 @@ type DeliveryDimensions struct {
 }
 
 // Rate now acts as a dynamic provider selector
-func (r *Rate) Calculate(details DeliveryDetails) ([]map[string]interface{}, error) {
+func (r *Rate) Calculate(details DeliveryDetails) ([]FrightRate, error) {
 	var provider Provider
 	switch r.Provider {
 	case "FEDEX":
@@ -36,13 +36,16 @@ func (r *Rate) Calculate(details DeliveryDetails) ([]map[string]interface{}, err
 }
 
 // calculateBase handles the base Rate calculation logic
-func (r *Rate) calculateBase(details DeliveryDetails) ([]map[string]interface{}, error) {
+func (r *Rate) calculateBase(details DeliveryDetails) ([]FrightRate, error) {
 	// Implement your base rate calculation logic here
 	// This is a placeholder implementation
-	result := []map[string]interface{}{
+	result := []FrightRate{
 		{
-			"price":    0.0,
-			"provider": "DEFAULT",
+			Title:       "Default Shipping",
+			Description: "Base rate calculation",
+			Handle:      "default_shipping",
+			Currency:    "USD",
+			Price:       0.0,
 		},
 	}
 	return result, nil

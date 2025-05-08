@@ -119,7 +119,7 @@ func fetchFedExRates(clientID, clientSecret string, payload map[string]interface
 }
 
 // Updated the FedExProvider to include available service options, their codes, descriptions, delivery dates, and pricing parameters.
-func (f *FedExProvider) Calculate(details DeliveryDetails) ([]map[string]interface{}, error) {
+func (f *FedExProvider) Calculate(details DeliveryDetails) ([]FrightRate, error) {
 	f.Logger.Info().Msg("Calculating rate for delivery via FedEx")
 
 	// Build request payload
@@ -158,6 +158,29 @@ func (f *FedExProvider) Calculate(details DeliveryDetails) ([]map[string]interfa
 		},
 	}
 
+	// Sample response for testing purposes
+
+	sampleResponse := []FrightRate{}
+	sampleResponse = append(sampleResponse, FrightRate{
+		Title:       "FedEx Express Saver",
+		Description: "Delivery via FedEx By 2023-10-15 17:00",
+		Handle:      "FEDEX_EXPRESS_SAVER",
+		Price:       100.0,
+		Currency:    "USD",
+	})
+
+	sampleResponse = append(sampleResponse, FrightRate{
+		Title:       "FedEx 2Day",
+		Description: "Delivery via FedEx By 2023-10-15 17:00",
+		Handle:      "FEDEX_2DAY",
+		Price:       150.0,
+		Currency:    "USD",
+	})
+
+	return sampleResponse, nil
+
+	// Uncomment the following lines to use the actual FedEx API
+
 	// Use fetchFedExRates to get rates
 	result, err := fetchFedExRates(f.ApiKey, f.ApiSecret, payload)
 	if err != nil {
@@ -177,7 +200,7 @@ func (f *FedExProvider) Calculate(details DeliveryDetails) ([]map[string]interfa
 	}
 
 	// Extract service options
-	serviceOptions := []map[string]interface{}{}
+	serviceOptions := []FrightRate{}
 	for _, detail := range rateReplyDetails {
 		detailMap, ok := detail.(map[string]interface{})
 		if !ok {
@@ -199,13 +222,12 @@ func (f *FedExProvider) Calculate(details DeliveryDetails) ([]map[string]interfa
 		price, _ := firstRatedDetail["totalNetCharge"].(float64)
 		currency, _ := firstRatedDetail["currency"].(string)
 
-		serviceOptions = append(serviceOptions, map[string]interface{}{
-			"serviceType":  serviceType,
-			"serviceName":  serviceName,
-			"deliveryDate": deliveryDate,
-			"deliveryTime": deliveryTime,
-			"price":        price,
-			"currency":     currency,
+		serviceOptions = append(serviceOptions, FrightRate{
+			Title:       serviceName,
+			Description: "Delivery via FedEx By " + deliveryDate + " " + deliveryTime,
+			Handle:      serviceType,
+			Price:       price,
+			Currency:    currency,
 		})
 	}
 
